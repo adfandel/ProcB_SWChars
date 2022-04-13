@@ -88,6 +88,7 @@ stat.testExtrema <- AllChars %>%
     p.adjust.method = "bonferroni")
 
 ##### Boxplots of t-tests #####
+## Figure 3 ##
 ## Site 
 AllChars$Sites <- ordered(AllChars$Sites, levels = c("1","2","3","4","5"))
 
@@ -193,6 +194,7 @@ bxpExt + stat_pvalue_manual(
   ylab("Log Number of Extrema")
 
 #### Region ####
+## Figure 4 ##
 AllChars$Region <- ordered(AllChars$Region, levels = c("Bay","Coastal","Offshore"))
 
 # Start
@@ -296,6 +298,7 @@ bxpExtR + stat_pvalue_manual(
   ylab("Log Number of Extrema")
 
 ##### Boruta plots of importance of whistle characteristics #####
+## Figure 5 ##
 set.seed(6978)
 AllCharsFact$Site <- as.factor(AllCharsFact$Site)
 B=Boruta::Boruta(as.formula(Site~.),
@@ -312,7 +315,7 @@ BR
 plot(BR, horizontal = T, las=1, xlab="Importance", ylab="", cex.axis = 0.6)
 
 ##### GEE #####
-Match <- read.csv("MatchedSW_Chars_210927_MatchRemoveT3T10.csv", header = T) 
+Match <- read.csv("MMatchedSW_Chars_210927_FinalMatchUpload.csv", header = T) 
 Match$SiteNum <- as.factor(Match$SiteNum)
 
 mfStart <- formula(Startfreq ~ SiteNum * SPLrms)
@@ -343,7 +346,24 @@ mfExt <- formula(Extrema ~ SiteNum * SPLrms)
 geeExt <- geeglm(mfExt, data=Match, id=Index)
 summary(geeExt)
 
+## Figure 6 ##
+SLDaySum$SiteNum <- as.factor(SLDaySum$SiteNum)
+SLDaySum2 <- as.data.frame(SLDaySum)
+stat.testSL <- SLDaySum2 %>%
+  pairwise_t_test(
+    median ~ SiteNum, paired = FALSE, 
+    p.adjust.method = "bonferroni")
+stat.testSL
+bxpSL <- ggboxplot(
+  SLDaySum, x = "SiteNum", y = "median",
+  color = "SiteNum", palette = "jco")
+stat.testSL <- stat.testSL %>% add_xy_position(x = "SiteNum")
+bxpSL + stat_pvalue_manual(
+  stat.testSL, label = "p.adj.signif", hide.ns = TRUE,  tip.length = 0.01) +
+  ylab("Median Daily Sound Level (SPL rms: dB re 1V/?Pa)")
+
 ##### Network plot ######
+## Figure 7 ##
 DiffSiteMatch <- read.csv("MatchedWhistle_211108_DiffSite_SiteNum_ToFrom.csv", header=T)
 g<- graph.data.frame(DiffSiteMatch)
 plot(g, vertex.label.dist=3, edge.width = 1, 
