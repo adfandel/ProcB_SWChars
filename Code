@@ -1,0 +1,353 @@
+library(ggplot2)
+library(geepack)
+library(tidyr)
+library(rstatix)
+library(ggpubr)
+library(lme4)
+library(Boruta)
+library(plotmo)
+
+AllChars <- read.csv("AllChars_211025.csv")
+
+##### Boxcox analysis for normality of whistle characteristics #####
+shapiro.test(AllChars$Startfreq) 
+boxcox(AllChars$Startfreq ~ AllChars$Site)
+AllChars$sqrtStart <- sqrt(AllChars$Startfreq)
+
+shapiro.test(AllChars$Endfreq) 
+boxcox(AllChars$Endfreq ~ AllChars$Site)
+AllChars$sqrtEnd <- sqrt(AllChars$Endfreq)
+
+shapiro.test(AllChars$Minfreq) 
+boxcox(AllChars$Minfreq ~ AllChars$Site)
+AllChars$sqrtMin <- sqrt(AllChars$Minfreq)
+
+shapiro.test(AllChars$Maxfreq) 
+boxcox(AllChars$Maxfreq ~ AllChars$Site)
+AllChars$sqrtMax <- sqrt(AllChars$Maxfreq)
+
+shapiro.test(AllChars$Deltafreq) 
+boxcox(AllChars$Deltafreq ~ AllChars$Site)
+AllChars$sqrtDelta <- sqrt(AllChars$Deltafreq)
+
+shapiro.test(AllChars$Extrema) 
+boxcox(AllChars$Extrema ~ AllChars$Site)
+AllChars$logExtrema <- log(AllChars$Extrema)
+
+shapiro.test(AllChars$Duration) 
+boxcox(AllChars$Duration ~ AllChars$Site)
+AllChars$logDuration <- log(AllChars$Duration)
+
+##### MANOVAs #####
+AllVarsTrans <- manova(cbind(sqrtStart.freq, sqrtEnd.freq, sqrtDelta.freq, logLength, 
+                             logExtrema, sqrtMin.freq, sqrtMax.freq) ~
+                         Sites, data = AllChars)
+summary(AllVarsTrans)
+summary.aov(AllVarsTrans)
+
+RegionVarsTrans <- manova(cbind(sqrtStart.freq, sqrtEnd.freq, sqrtDelta.freq, logLength, 
+                                logExtrema, sqrtMin.freq, sqrtMax.freq) ~ Region, 
+                          data = AllChars)
+summary(RegionVarsTrans)
+summary.aov(RegionVarsTrans)
+
+##### T-tests #####
+stat.testStart <- AllChars %>%
+  pairwise_t_test(
+    sqrtStart.freq ~ Sites, paired = FALSE, 
+    p.adjust.method = "bonferroni")
+
+stat.testEnd <- AllChars %>%
+  pairwise_t_test(
+    sqrtEnd.freq ~ Sites, paired = FALSE, 
+    p.adjust.method = "bonferroni")
+
+stat.testMin <- AllChars %>%
+  pairwise_t_test(
+    sqrtMin.freq ~ Sites, paired = FALSE, 
+    p.adjust.method = "bonferroni")
+
+stat.testMax <- AllChars %>%
+  pairwise_t_test(
+    sqrtMax.freq ~ Sites, paired = FALSE, 
+    p.adjust.method = "bonferroni")
+
+stat.testDelta <- AllChars %>%
+  pairwise_t_test(
+    sqrtDelta.freq ~ Sites, paired = FALSE, 
+    p.adjust.method = "bonferroni")
+
+stat.testDuration<- AllChars %>%
+  pairwise_t_test(
+    logDuration ~ Sites, paired = FALSE, 
+    p.adjust.method = "bonferroni")
+
+stat.testExtrema <- AllChars %>%
+  pairwise_t_test(
+    logExtrema ~ Sites, paired = FALSE, 
+    p.adjust.method = "bonferroni")
+
+##### Boxplots of t-tests #####
+## Site 
+AllChars$Sites <- ordered(AllChars$Sites, levels = c("1","2","3","4","5"))
+
+# Start
+stat.testStart <- AllChars %>%
+  pairwise_t_test(
+    sqrtStart.freq ~ Sites, paired = FALSE, 
+    p.adjust.method = "bonferroni")
+stat.testStart
+bxpStart <- ggboxplot(
+  AllChars, x = "Sites", y = "sqrtStart.freq",
+  color = "Region", palette=c("black", "blue","red"))
+# Add statistical test p-values
+stat.testStart <- stat.testStart %>% add_xy_position(x = "Sites")
+bxpStart + stat_pvalue_manual(
+  stat.testStart, label = "p.adj.signif", hide.ns = TRUE, vjust = .01, tip.length = 0.01) +
+  ylab("Sqrt Start Frequency (Hz)")
+
+# End
+stat.testEnd <- AllChars %>%
+pairwise_t_test(
+  sqrtEnd.freq ~ Sites, paired = FALSE, 
+  p.adjust.method = "bonferroni")
+stat.testEnd
+bxpEnd <- ggboxplot(
+  AllChars, x = "Sites", y = "sqrtEnd.freq",
+  color = "Region", palette=c("black", "blue","red"))
+stat.testEnd <- stat.testStart %>% add_xy_position(x = "Sites")
+bxpEnd + stat_pvalue_manual(
+  stat.testEnd, label = "p.adj.signif", hide.ns = TRUE, vjust = .01, tip.length = 0.01) +
+  ylab("Sqrt End Frequency (Hz)")
+
+# Min
+stat.testMin <- AllChars %>%
+  pairwise_t_test(
+    sqrtMin ~ Sites, paired = FALSE, 
+    p.adjust.method = "bonferroni")
+stat.testMin
+bxpMin <- ggboxplot(
+  AllChars, x = "Sites", y = "sqrtMin",
+  color = "Region", palette=c("black", "blue","red"))
+stat.testMin <- stat.testMin %>% add_xy_position(x = "Sites")
+bxpMin + stat_pvalue_manual(
+  stat.testMin, label = "p.adj.signif", hide.ns = TRUE, tip.length = 0.01,
+  vjust = .01, step.increase = 0.03) +
+  ylab("Sqrt Minimum Frequency (Hz)")
+
+# Max
+stat.testMax <- AllChars %>%
+  pairwise_t_test(
+    sqrtMax ~ Sites, paired = FALSE, 
+    p.adjust.method = "bonferroni")
+stat.testMax
+bxpMax <- ggboxplot(
+  AllChars, x = "Sites", y = "sqrtMax",
+  color = "Region", palette=c("black", "blue","red"))
+stat.testMax <- stat.testMax %>% add_xy_position(x = "Sites")
+bxpMax + stat_pvalue_manual(
+  stat.testMax, label = "p.adj.signif", hide.ns = TRUE)
+
+# Delta
+stat.testDelta <- AllChars %>%
+  pairwise_t_test(
+    sqrtDelta.freq ~ Sites, paired = FALSE, 
+    p.adjust.method = "bonferroni")
+stat.testDelta
+bxpDelta <- ggboxplot(
+  AllChars, x = "Sites", y = "sqrtDelta.freq",
+  color = "Region", palette=c("black", "blue","red"))
+stat.testDelta <- stat.testStart %>% add_xy_position(x = "Sites")
+bxpDelta + stat_pvalue_manual(
+  stat.testDelta, label = "p.adj.signif", hide.ns = TRUE) +
+  ylab("Sqrt Delta Frequency (Hz)")
+
+# Duration
+stat.testDur <- AllChars %>%
+  pairwise_t_test(
+    logLength ~ Sites, paired = FALSE, 
+    p.adjust.method = "bonferroni")
+stat.testLen
+bxpLen <- ggboxplot(
+  AllChars, x = "Sites", y = "logLength",
+  color = "Region", palette=c("black", "blue","red"))
+stat.testLen <- stat.testLen %>% add_xy_position(x = "Sites")
+bxpLen + stat_pvalue_manual(
+  stat.testLen, label = "p.adj.signif", hide.ns = TRUE, vjust = .01, tip.length = 0.01,
+  step.increase = 0.02) +
+  ylab("Log Duration (s)")
+
+# Extrema
+stat.testExt <- AllChars %>%
+  pairwise_t_test(
+    logExt ~ Sites, paired = FALSE, 
+    p.adjust.method = "bonferroni")
+stat.testExt
+bxpExt <- ggboxplot(
+  AllChars, x = "Sites", y = "logExt",
+  color = "Region", palette=c("black", "blue","red"))
+stat.testExt <- stat.testExt %>% add_xy_position(x = "Sites")
+bxpExt + stat_pvalue_manual(
+  stat.testExt, label = "p.adj.signif", hide.ns = TRUE, vjust = .001, tip.length = 0.01,
+  step.increase = 0.02) +
+  ylab("Log Number of Extrema")
+
+#### Region ####
+AllChars$Region <- ordered(AllChars$Region, levels = c("Bay","Coastal","Offshore"))
+
+# Start
+stat.testStartR <- AllChars %>%
+  pairwise_t_test(
+    sqrtStart.freq ~ Region, paired = FALSE, 
+    p.adjust.method = "bonferroni")
+stat.testStartR
+bxpStartR <- ggboxplot(
+  AllChars, x = "Region", y = "sqrtStart.freq",
+  color = "Region", palette =c("black", "blue","red"))
+stat.testStartR <- stat.testStartR %>% add_xy_position(x = "Region")
+bxpStartR + stat_pvalue_manual(
+  stat.testStartR, label = "p.adj.signif", hide.ns = TRUE, vjust = .01, tip.length = 0.01,
+  step.increase = 0.1)+
+  ylab("Sqrt Start Frequency (Hz)")
+
+# End
+stat.testEndR <- AllChars %>%
+  pairwise_t_test(
+    sqrtEnd.freq ~ Region, paired = FALSE, 
+    p.adjust.method = "bonferroni")
+stat.testEndR
+bxpEndR <- ggboxplot(
+  AllChars, x = "Region", y = "sqrtEnd.freq",
+  color = "Region", palette =c("black", "blue","red"))
+stat.testEndR <- stat.testEndR %>% add_xy_position(x = "Region")
+bxpEndR + stat_pvalue_manual(
+  stat.testEndR, label = "p.adj.signif", hide.ns = TRUE, vjust = .1, tip.length = 0.01,
+  step.increase = 0.1) +
+  ylab("Sqrt End Frequency (Hz)")
+
+# Min
+stat.testMinR <- AllChars %>%
+  pairwise_t_test(
+    sqrtMin ~ Region, paired = FALSE, 
+    p.adjust.method = "bonferroni")
+stat.testMinR
+bxpMinR <- ggboxplot(
+  AllChars, x = "Region", y = "sqrtMin",
+  color = "Region", palette =c("black", "blue","red"))
+stat.testMinR <- stat.testMinR %>% add_xy_position(x = "Region")
+bxpMinR + stat_pvalue_manual(
+  stat.testMinR, label = "p.adj.signif", hide.ns = TRUE, vjust = .1, tip.length = 0.01,
+  step.increase = 0.1) +
+  ylab("Sqrt Minimum Frequency (Hz)")
+
+# Max
+stat.testMaxR <- AllChars %>%
+  pairwise_t_test(
+    sqrtMax ~ Region, paired = FALSE, 
+    p.adjust.method = "bonferroni")
+stat.testMaxR
+bxpMaxR <- ggboxplot(
+  AllChars, x = "Region", y = "sqrtMin",
+  color = "Region", palette =c("black", "blue","red"))
+stat.testMaxR <- stat.testMaxR %>% add_xy_position(x = "Region")
+bxpMaxR + stat_pvalue_manual(
+  stat.testMaxR, label = "p.adj.signif", hide.ns = TRUE)
+
+# Delta
+stat.testDelR <- AllChars %>%
+  pairwise_t_test(
+    sqrtDelta.freq ~ Region, paired = FALSE, 
+    p.adjust.method = "bonferroni")
+stat.testDelR
+bxpDelR <- ggboxplot(
+  AllChars, x = "Region", y = "sqrtDelta.freq",
+  color = "Region", palette =c("black", "blue","red"))
+stat.testDelR <- stat.testDelR %>% add_xy_position(x = "Region")
+bxpDelR + stat_pvalue_manual(
+  stat.testDelR, label = "p.adj.signif", hide.ns = TRUE) +
+  ylab("Sqrt Delta Frequency (Hz)")
+
+# Duration
+stat.testLenR <- AllChars %>%
+  pairwise_t_test(
+    logLength ~ Region, paired = FALSE, 
+    p.adjust.method = "bonferroni")
+stat.testLenR
+bxpLenR <- ggboxplot(
+  AllChars, x = "Region", y = "logLength",
+  color = "Region", palette =c("black", "blue","red"))
+stat.testLenR <- stat.testLenR %>% add_xy_position(x = "Region")
+bxpLenR + stat_pvalue_manual(
+  stat.testLenR, label = "p.adj.signif", hide.ns = TRUE, vjust = .1, tip.length = 0.01) + 
+  ylab("Log Duration (s)")
+
+# Extrema
+stat.testExtR <- AllChars %>%
+  pairwise_t_test(
+    logExt ~ Region, paired = FALSE, 
+    p.adjust.method = "bonferroni")
+stat.testExtR
+bxpExtR <- ggboxplot(
+  AllChars, x = "Region", y = "logExt",
+  color = "Region", palette =c("black", "blue","red"))
+stat.testExtR <- stat.testExtR %>% add_xy_position(x = "Region")
+bxpExtR + stat_pvalue_manual(
+  stat.testExtR, label = "p.adj.signif", hide.ns = TRUE, vjust = .1, tip.length = 0.01) +
+  ylab("Log Number of Extrema")
+
+##### Boruta plots of importance of whistle characteristics #####
+set.seed(6978)
+AllCharsFact$Site <- as.factor(AllCharsFact$Site)
+B=Boruta::Boruta(as.formula(Site~.),
+                 maxRuns=10000, data=AllCharsFact)
+B
+plot(B, horizontal = T, las=1, xlab="Importance", ylab="", cex.axis=0.6, cex.lab=1, space=1)
+rotate_x_text(45)
+
+# By region
+AllCharsFactR$Region <- as.factor(AllCharsFactR$Region)
+BR=Boruta::Boruta(as.formula(Region~.),
+                  maxRuns=10000, data=AllCharsFactR)
+BR
+plot(BR, horizontal = T, las=1, xlab="Importance", ylab="", cex.axis = 0.6)
+
+##### GEE #####
+Match <- read.csv("MatchedSW_Chars_210927_MatchRemoveT3T10.csv", header = T) 
+Match$SiteNum <- as.factor(Match$SiteNum)
+
+mfStart <- formula(Startfreq ~ SiteNum * SPLrms)
+geeStart <- geeglm(mfStart, data=Match, id=Index)
+summary(geeStart)  
+
+mfEnd <- formula(Endfreq ~ SiteNum * SPLrms)
+geeEnd <- geeglm(mfEnd, data=Match, id=Index)
+summary(geeEnd) 
+
+mfDelta <- formula(Deltafreq ~ SPLrms)
+geeDelta <- geeglm(mfDelta, data=Match, id=Index)
+summary(geeDelta)
+
+mfMin <- formula(Minfreq ~ SiteNum * SPLrms)
+geeMin <- geeglm(mfMin, data=Match, id=Index)
+summary(geeMin)
+
+mfMax <- formula(Maxfreq ~ SiteNum * SPLrms)
+geeMax <- geeglm(mfMax, data=Match, id=Index)
+summary(geeMax)
+
+mfDur <- formula(Duration ~ SiteNum * SPLrms)
+geeDur <- geeglm(mfDur, data=Match, id=Index)
+summary(geeLen)  
+
+mfExt <- formula(Extrema ~ SiteNum * SPLrms)
+geeExt <- geeglm(mfExt, data=Match, id=Index)
+summary(geeExt)
+
+##### Network plot ######
+DiffSiteMatch <- read.csv("MatchedWhistle_211108_DiffSite_SiteNum_ToFrom.csv", header=T)
+g<- graph.data.frame(DiffSiteMatch)
+plot(g, vertex.label.dist=3, edge.width = 1, 
+     vertex.label.font=2,  edge.arrow.size = 0.3, vertex.label.color = "black",
+     vertex.frame.color=c("blue", "blue", "black", "black","red"),
+     vertex.label.cex = 1.5, vertex.size=c(327/19, 1172/19, 333/19, 19/19, 37/19), 
+     vertex.color=c("blue", "blue", "black", "black", "red"))
